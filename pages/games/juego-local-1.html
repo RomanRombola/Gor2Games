@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snake Gor2</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0a0a0a; color:#f0f0f0; font-family:'Courier New',monospace; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; user-select:none; }
+  h1 { font-size:22px; letter-spacing:4px; color:#ff6600; margin-bottom:8px; text-shadow:0 0 12px rgba(255,102,0,0.8); }
+  #info { display:flex; gap:30px; margin-bottom:14px; font-size:14px; color:#888; }
+  #info span { color:#ffe600; font-weight:700; }
+  canvas { border:2px solid #ff6600; border-radius:6px; box-shadow:0 0 20px rgba(255,102,0,0.4); display:block; }
+  #msg { margin-top:14px; font-size:16px; color:#ffe600; letter-spacing:2px; min-height:22px; text-align:center; }
+  #controles { margin-top:12px; font-size:12px; color:#555; }
+  .btn-reiniciar { margin-top:12px; background:linear-gradient(135deg,#ff6600,#ff9500); border:none; color:white; font-family:'Courier New',monospace; font-size:14px; font-weight:700; padding:10px 24px; border-radius:8px; cursor:pointer; letter-spacing:2px; display:none; }
+  .btn-reiniciar.visible { display:inline-block; }
+</style>
+</head>
+<body>
+<h1>🐍 SNAKE GOR2</h1>
+<div id="info">PUNTAJE: <span id="score">0</span> &nbsp;|&nbsp; NIVEL: <span id="lvl">1</span> &nbsp;|&nbsp; MEJOR: <span id="best">0</span></div>
+<canvas id="c" width="400" height="400"></canvas>
+<div id="msg">Presioná ESPACIO o tocá para comenzar</div>
+<div id="controles">WASD / Flechas para mover · Mobile: swipe</div>
+<button class="btn-reiniciar" id="btn-r" onclick="init()">▶ REINICIAR</button>
+
+<script>
+const C = document.getElementById("c");
+const ctx = C.getContext("2d");
+const SZ = 20, COLS = C.width/SZ, ROWS = C.height/SZ;
+let snake, dir, nextDir, food, score, vel, loop, started, dead;
+const best = () => parseInt(localStorage.getItem("snake_best")||"0");
+document.getElementById("best").textContent = best();
+
+function init() {
+  snake = [{x:10,y:10},{x:9,y:10},{x:8,y:10}];
+  dir = {x:1,y:0}; nextDir = {x:1,y:0};
+  score = 0; vel = 150; started = false; dead = false;
+  placeFood();
+  document.getElementById("score").textContent = 0;
+  document.getElementById("lvl").textContent = 1;
+  document.getElementById("msg").textContent = "Presioná ESPACIO o tocá para comenzar";
+  document.getElementById("btn-r").classList.remove("visible");
+  clearInterval(loop);
+  draw();
+}
+
+function placeFood() {
+  let pos;
+  do { pos={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS)}; }
+  while(snake.some(s=>s.x===pos.x&&s.y===pos.y));
+  food=pos;
+}
+
+function step() {
+  dir = nextDir;
+  const head = {x:snake[0].x+dir.x, y:snake[0].y+dir.y};
+  if(head.x<0||head.x>=COLS||head.y<0||head.y>=ROWS||snake.some(s=>s.x===head.x&&s.y===head.y)) {
+    gameOver(); return;
+  }
+  snake.unshift(head);
+  if(head.x===food.x&&head.y===food.y) {
+    score++; placeFood();
+    if(score>best()) localStorage.setItem("snake_best",score);
+    document.getElementById("score").textContent = score;
+    document.getElementById("best").textContent = best();
+    const lvl = Math.floor(score/5)+1;
+    document.getElementById("lvl").textContent = lvl;
+    vel = Math.max(60, 150 - lvl*12);
+    clearInterval(loop); loop = setInterval(step, vel);
+  } else { snake.pop(); }
+  draw();
+}
+
+function draw() {
+  ctx.fillStyle="#0a0a0a"; ctx.fillRect(0,0,C.width,C.height);
+  // Grid sutil
+  ctx.strokeStyle="rgba(255,255,255,0.03)";
+  for(let x=0;x<COLS;x++){ctx.beginPath();ctx.moveTo(x*SZ,0);ctx.lineTo(x*SZ,C.height);ctx.stroke();}
+  for(let y=0;y<ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*SZ);ctx.lineTo(C.width,y*SZ);ctx.stroke();}
+  // Food
+  ctx.shadowColor="#ffe600"; ctx.shadowBlur=14;
+  ctx.fillStyle="#ffe600"; ctx.fillRect(food.x*SZ+2,food.y*SZ+2,SZ-4,SZ-4);
+  ctx.shadowBlur=0;
+  // Snake
+  snake.forEach((s,i)=>{
+    const t = 1 - i/snake.length;
+    ctx.fillStyle = i===0 ? "#ff6600" : `hsl(${25+t*40},100%,${30+t*25}%)`;
+    ctx.shadowColor = i===0 ? "#ff6600" : "transparent";
+    ctx.shadowBlur = i===0 ? 10 : 0;
+    ctx.fillRect(s.x*SZ+1,s.y*SZ+1,SZ-2,SZ-2);
+    ctx.shadowBlur=0;
+  });
+  // Ojos
+  const h=snake[0];
+  ctx.fillStyle="#000";
+  const ex=dir.x===0?[5,13]:[dir.x>0?12:3,dir.x>0?12:3];
+  const ey=dir.y===0?[5,13]:[dir.y>0?12:3,dir.y>0?12:3];
+  [[ex[0],ey[0]],[ex[1],ey[1]]].forEach(([ox,oy])=>{ctx.fillRect(h.x*SZ+ox,h.y*SZ+oy,3,3);});
+}
+
+function gameOver() {
+  dead=true; clearInterval(loop);
+  document.getElementById("msg").textContent = `💀 GAME OVER — Puntaje: ${score}`;
+  document.getElementById("btn-r").classList.add("visible");
+  ctx.fillStyle="rgba(0,0,0,0.65)"; ctx.fillRect(0,0,C.width,C.height);
+  ctx.font="bold 28px 'Courier New'"; ctx.fillStyle="#ff6600"; ctx.textAlign="center";
+  ctx.shadowColor="#ff6600"; ctx.shadowBlur=16;
+  ctx.fillText("GAME OVER",C.width/2,C.height/2);
+  ctx.font="18px 'Courier New'"; ctx.fillStyle="#ffe600"; ctx.shadowBlur=0;
+  ctx.fillText(`Puntaje: ${score}`,C.width/2,C.height/2+32);
+}
+
+function start() { if(started||dead)return; started=true; document.getElementById("msg").textContent=""; loop=setInterval(step,vel); }
+
+document.addEventListener("keydown",e=>{
+  const m={ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0},w:{x:0,y:-1},s:{x:0,y:1},a:{x:-1,y:0},d:{x:1,y:0}};
+  if(e.key===" "){e.preventDefault();start();return;}
+  const d=m[e.key];
+  if(d&&!(d.x===-dir.x&&d.y===0)&&!(d.y===-dir.y&&d.x===0)){nextDir=d;}
+});
+
+// Touch/swipe
+let t0;
+C.addEventListener("touchstart",e=>{t0=e.touches[0];start();},{passive:true});
+C.addEventListener("touchend",e=>{
+  if(!t0)return; const t1=e.changedTouches[0];
+  const dx=t1.clientX-t0.clientX, dy=t1.clientY-t0.clientY;
+  if(Math.abs(dx)>Math.abs(dy)){nextDir=dx>0?{x:1,y:0}:{x:-1,y:0};}
+  else{nextDir=dy>0?{x:0,y:1}:{x:0,y:-1};}
+},{passive:true});
+
+init();
+</script>
+</body>
+</html>
